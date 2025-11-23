@@ -1,42 +1,32 @@
 from flask import Flask, request, jsonify
-import psycopg2
+import psycopg
 import os
 from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# Подключение к БД
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     url = urlparse(DATABASE_URL)
-    conn = psycopg2.connect(
-        database=url.path[1:],  # убираем слэш в начале
-        user=url.username,
-        password=url.password,
-        host=url.hostname,
-        port=url.port
-    )
+    conn = psycopg.connect(DATABASE_URL)
 else:
     conn = None
 
-# Создание таблицы messages при старте сервиса
 if conn:
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS messages (
                 id SERIAL PRIMARY KEY,
                 content TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW()
             )
         """)
         conn.commit()
 
-# Эндпоинт /
 @app.route('/')
 def hello():
     return "Hello, Serverless! 🚀\n", 200, {'Content-Type': 'text/plain'}
 
-# Эндпоинт /echo для POST JSON
 @app.route('/echo', methods=['POST'])
 def echo():
     data = request.get_json()
@@ -46,7 +36,6 @@ def echo():
         "length": len(str(data)) if data else 0
     })
 
-# Эндпоинт /save для сохранения сообщения в PostgreSQL
 @app.route('/save', methods=['POST'])
 def save_message():
     if not conn:
@@ -61,7 +50,6 @@ def save_message():
 
     return jsonify({"status": "saved", "message": message})
 
-# Эндпоинт /messages для получения последних 10 сообщений
 @app.route('/messages')
 def get_messages():
     if not conn:
@@ -74,5 +62,5 @@ def get_messages():
     messages = [{"id": r[0], "text": r[1], "time": r[2].isoformat()} for r in rows]
     return jsonify(messages)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
